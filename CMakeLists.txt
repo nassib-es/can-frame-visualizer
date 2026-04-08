@@ -22,6 +22,7 @@ qt_add_qml_module(appcan_frame_visualizer
     URI can_frame_visualizer
     QML_FILES
         Main.qml
+        RESOURCES README.md
 )
 
 target_include_directories(appcan_frame_visualizer PRIVATE include)
