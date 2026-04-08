@@ -75,7 +75,11 @@ QVariantMap CANBackend::buildFrame(const QString& id, int dlc,
     addField("RTR+IDE",  type == "RTR" ? "1 0" : "0 0",          "#FFB74D");
     addField("DLC",      QString::number(dlc) + " bytes",         "#81C784");
     addField("DATA",     data.toUpper(),                          "#CE93D8");
-    addField("CRC-15",   "calculated",                            "#F06292");
+    // Encode frame locally just to get CRC value for display
+    uint8_t tempBits[256] = {};
+    uint32_t tempLen = frame.encode(tempBits, 256);
+    uint16_t crcVal = CRC15::calculate(tempBits, tempLen);
+    addField("CRC-15", QString("0x%1").arg(crcVal, 4, 16, QChar('0')).toUpper(), "#F06292");
     addField("STUFF",    QString::number(stuffBits) + " bits inserted", "#FFD54F");
 
     result["valid"]     = true;
@@ -153,7 +157,21 @@ QVariantList CANBackend::encodeBitStream(const CANFrame& frame, int& stuffBits) 
             lastBit = stuffBit;
         }
     }
+    // Append CRC-15 bits in pink
+    uint16_t crc = CRC15::calculate(rawBits, rawLen);
+    for (int i = 14; i >= 0; i--) {
+        uint8_t crcBit = (crc >> i) & 1;
+        QVariantMap crcEntry;
+        crcEntry["bit"]        = QString::number(crcBit);
+        crcEntry["fieldColor"] = "#F06292";
+        result.append(crcEntry);
+    }
 
+    // CRC delimiter (recessive, 1)
+    QVariantMap delim;
+    delim["bit"]        = "1";
+    delim["fieldColor"] = "#F06292";
+    result.append(delim);
     return result;
 }
 
