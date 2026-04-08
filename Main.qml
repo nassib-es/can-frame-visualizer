@@ -287,6 +287,14 @@ Window {
                             delegate: Rectangle {
                                 width: 18; height: 28; radius: 2
                                 color: model.fieldColor
+                                opacity: 0
+
+                                SequentialAnimation on opacity {
+                                    running: true
+                                    PauseAnimation { duration: index * 15 + 1}
+                                    NumberAnimation { from: 0; to: 1; duration: 30 }
+                                }
+
                                 Text {
                                     anchors.centerIn: parent
                                     text: model.bit
