@@ -72,9 +72,15 @@ QVariantMap CANBackend::buildFrame(const QString& id, int dlc,
 
     addField("SOF",      "0 (dominant)",                          "#FF4444");
     addField("ID",       "0x" + id.toUpper() + " (" + QString::number(dlc) + "B)", "#00D4FF");
-    addField("RTR+IDE",  type == "RTR" ? "1 0" : "0 0",          "#FFB74D");
+    if (type == "EXT")
+        addField("SRR+IDE+RTR", "1 1 0", "#FFB74D");
+    else if (type == "RTR")
+        addField("RTR+IDE", "1 0", "#FFB74D");
+    else
+        addField("RTR+IDE", "0 0", "#FFB74D");
+
     addField("DLC",      QString::number(dlc) + " bytes",         "#81C784");
-    addField("DATA",     data.toUpper(),                          "#CE93D8");
+    addField("DATA", type == "RTR" ? "no data (remote request)" : data.toUpper(), "#CE93D8");
     // Encode frame locally just to get CRC value for display
     uint8_t tempBits[256] = {};
     uint32_t tempLen = frame.encode(tempBits, 256);
@@ -88,7 +94,7 @@ QVariantMap CANBackend::buildFrame(const QString& id, int dlc,
     result["stuffBits"] = stuffBits;
     result["frameId"]   = id.toUpper();
     result["dlc"]       = dlc;
-    result["data"]      = data.toUpper();
+    result["data"] = type == "RTR" ? "no data" : data.toUpper();
     result["frameType"] = type;
 
     return result;
@@ -108,11 +114,22 @@ QVariantList CANBackend::encodeBitStream(const CANFrame& frame, int& stuffBits) 
 
     QVector<FieldRange> ranges;
     uint32_t pos = 0;
-    ranges.append({pos, pos,      "#FF4444"}); pos += 1;  // SOF
-    ranges.append({pos, pos+10,   "#00D4FF"}); pos += 11; // ID
-    ranges.append({pos, pos+2,    "#FFB74D"}); pos += 3;  // RTR+IDE+r0
-    ranges.append({pos, pos+3,    "#81C784"}); pos += 4;  // DLC
-    ranges.append({pos, rawLen-1, "#CE93D8"});             // Data
+
+    if (frame.getIDType() == CANIDType::EXTENDED) {
+        ranges.append({pos, pos,      "#FF4444"}); pos += 1;  // SOF
+        ranges.append({pos, pos+10,   "#00D4FF"}); pos += 11; // Base ID
+        ranges.append({pos, pos+1,    "#FFB74D"}); pos += 2;  // SRR+IDE
+        ranges.append({pos, pos+17,   "#00D4FF"}); pos += 18; // Extended ID
+        ranges.append({pos, pos+2,    "#FFB74D"}); pos += 3;  // RTR+r1+r0
+        ranges.append({pos, pos+3,    "#81C784"}); pos += 4;  // DLC
+        ranges.append({pos, rawLen-1, "#CE93D8"});             // Data
+    } else {
+        ranges.append({pos, pos,      "#FF4444"}); pos += 1;  // SOF
+        ranges.append({pos, pos+10,   "#00D4FF"}); pos += 11; // ID
+        ranges.append({pos, pos+2,    "#FFB74D"}); pos += 3;  // RTR+IDE+r0
+        ranges.append({pos, pos+3,    "#81C784"}); pos += 4;  // DLC
+        ranges.append({pos, rawLen-1, "#CE93D8"});             // Data
+    }
 
     auto getColor = [&](uint32_t idx) -> QString {
         for (const auto& r : ranges)
